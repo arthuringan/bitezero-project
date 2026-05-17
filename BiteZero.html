@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BiteZero Live Dengue Map</title>
+    
+    <!-- Leaflet CSS (Free map library) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f4f8;
+        }
+        
+        .map-container {
+            width: 100%;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+        
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            font-size: 12px;
+            min-width: 160px;
+        }
+        
+        .legend h4 {
+            margin-bottom: 8px;
+            color: #1a5276;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 1000;
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1001;
+        }
+    </style>
+</head>
+<body>
+<div class="map-container">
+    <div id="map"></div>
+    <div class="legend">
+        <h4>📍 BiteZero Risk Levels</h4>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #e74c3c;"></div>
+            <span>🔴 HIGH RISK - Clean-up within 24h</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #f1c40f;"></div>
+            <span>🟡 MEDIUM RISK - Inspect within 48h</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #27ae60;"></div>
+            <span>🟢 LOW RISK - Education reminder</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #3498db; border-radius: 50%;"></div>
+            <span>🔵 Accuracy circle (±30-50m)</span>
+        </div>
+    </div>
+    <div class="status" id="status">📡 Loading map data...</div>
+</div>
+
+<!-- Leaflet JavaScript -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    // ========================================
+    // BITEZERO LIVE MAP - Auto-updating from Google Sheets
+    // ========================================
+    
+    // ⚠️ IMPORTANT: REPLACE THIS WITH YOUR PUBLISHED GOOGLE SHEET CSV URL
+    // How to get it: File → Share → Publish to web → Select "Sheet1" → "CSV" → Copy link
+    const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTsoqv9LNvp6SNWui6p1MCS4Rfh3iWdwP70P1Zw-4etVs_fv1v6UrQygsywFZKwTqmzmkc-YbXrXDgx/pub?output=csv";
+    
+    // Risk tier settings
+    const riskConfig = {
+        "HIGH": { color: "#e74c3c", fillColor: "#e74c3c", radius: 50, label: "🔴 HIGH RISK" },
+        "MEDIUM": { color: "#f1c40f", fillColor: "#f1c40f", radius: 40, label: "🟡 MEDIUM RISK" },
+        "LOW": { color: "#27ae60", fillColor: "#27ae60", radius: 30, label: "🟢 LOW RISK" }
+    };
+    
+    let map;
+    let markersLayer;
+    let refreshInterval;
+    
+    // Initialize map
+    function initMap() {
+        // Center on Philippines (Manila coordinates)
+        map = L.map('map').setView([14.5995, 120.9842], 12);
+        
+        // Add OpenStreetMap tiles (free, no API key needed)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(map);
+        
+        markersLayer = L.layerGroup().addTo(map);
+        
+        // Load data immediately
+        loadMapData();
+        
+        // Auto-refresh every 60 seconds
+        refreshInterval = setInterval(loadMapData, 60000);
+    }
+    
+    // Fetch and parse CSV from Google Sheets
+    async function loadMapData() {
+        try {
+            updateStatus("🔄 Fetching latest reports...");
+            
+            const response = await fetch(CSV_URL);
+            if (!response.ok) throw new Error("Failed to fetch data");
+            
+            const csvText = await response.text();
+            const reports = parseCSV(csvText);
+            
+            if (reports.length === 0) {
+                updateStatus("⚠️ No reports found. Submit a test report!");
+                return;
+            }
+            
+            // Clear existing markers
+            markersLayer.clearLayers();
+            
+            // Add markers for each report
+            let validCount = 0;
+            reports.forEach(report => {
+                if (report.lat && report.lng && !isNaN(report.lat) && !isNaN(report.lng)) {
+                    addMarkerToMap(report);
+                    validCount++;
+                }
+            });
+            
+            updateStatus(`✅ Loaded ${validCount} reports. Auto-refreshes every 60 seconds.`);
+            
+            // Fit map to show all markers
+            if (markersLayer.getLayers().length > 0) {
+                const bounds = markersLayer.getBounds();
+                if (bounds.isValid()) {
+                    map.fitBounds(bounds.pad(0.1));
+                }
+            }
+            
+        } catch (error) {
+            console.error("Error loading map data:", error);
+            updateStatus(`❌ Error: ${error.message}. Check sheet is published.`);
+        }
+    }
+    
+    // Parse CSV into array of report objects
+    function parseCSV(csvText) {
+        const lines = csvText.split('\n');
+        if (lines.length < 2) return [];
+        
+        const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+        
+        // Find column indices
+        const latCol = findColumn(headers, ['GPS_Latitude', 'Latitude', 'lat']);
+        const lngCol = findColumn(headers, ['GPS_Longitude', 'Longitude', 'lng']);
+        const riskCol = findColumn(headers, ['Risk_Tier', 'Risk']);
+        const addressCol = findColumn(headers, ['Manual address', 'Location description', 'Address']);
+        const foundCol = findColumn(headers, ['What did you find']);
+        const containerCol = findColumn(headers, ['How many containers have standing water']);
+        
+        const reports = [];
+        
+        for (let i = 1; i < lines.length; i++) {
+            if (!lines[i].trim()) continue;
+            
+            const values = parseCSVLine(lines[i]);
+            if (values.length === 0) continue;
+            
+            const lat = parseFloat(values[latCol]?.replace(/"/g, '').trim());
+            const lng = parseFloat(values[lngCol]?.replace(/"/g, '').trim());
+            
+            if (isNaN(lat) || isNaN(lng)) continue;
+            
+            let riskText = riskCol !== -1 ? values[riskCol]?.replace(/"/g, '').trim() : "";
+            const address = addressCol !== -1 ? values[addressCol]?.replace(/"/g, '').trim() : "Unknown";
+            const foundWhat = foundCol !== -1 ? values[foundCol]?.replace(/"/g, '').trim() : "";
+            const containerCount = containerCol !== -1 ? values[containerCol]?.replace(/"/g, '').trim() : "";
+            
+            // Determine risk category from emoji or text
+            let riskCategory = "MEDIUM";
+            if (riskText.includes("🔴") || riskText.includes("HIGH")) riskCategory = "HIGH";
+            else if (riskText.includes("🟢") || riskText.includes("LOW")) riskCategory = "LOW";
+            else if (riskText.includes("🟡") || riskText.includes("MEDIUM")) riskCategory = "MEDIUM";
+            
+            reports.push({
+                lat: lat,
+                lng: lng,
+                riskCategory: riskCategory,
+                riskText: riskText,
+                address: address,
+                foundWhat: foundWhat,
+                containerCount: containerCount
+            });
+        }
+        
+        return reports;
+    }
+    
+    // Find column index by trying multiple possible names
+    function findColumn(headers, possibleNames) {
+        for (let i = 0; i < headers.length; i++) {
+            for (const name of possibleNames) {
+                if (headers[i] === name || headers[i].toLowerCase() === name.toLowerCase()) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+    
+    // Parse CSV line (handles quoted fields)
+    function parseCSVLine(line) {
+        const result = [];
+        let current = "";
+        let inQuotes = false;
+        
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (char === '"') {
+                inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+                result.push(current);
+                current = "";
+            } else {
+                current += char;
+            }
+        }
+        result.push(current);
+        return result;
+    }
+    
+    // Add a single marker with accuracy circle
+    function addMarkerToMap(report) {
+        const config = riskConfig[report.riskCategory] || riskConfig["MEDIUM"];
+        
+        // Create custom marker icon
+        const markerIcon = L.divIcon({
+            html: `<div style="background-color: ${config.fillColor}; width: 18px; height: 18px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></div>`,
+            iconSize: [18, 18],
+            className: 'custom-marker'
+        });
+        
+        const marker = L.marker([report.lat, report.lng], { icon: markerIcon }).addTo(markersLayer);
+        
+        // Add accuracy circle
+        L.circle([report.lat, report.lng], {
+            color: config.color,
+            fillColor: config.fillColor,
+            fillOpacity: 0.15,
+            radius: config.radius,
+            weight: 2
+        }).addTo(markersLayer);
+        
+        // Create popup content
+        const popupContent = `
+            <div style="min-width: 200px; font-family: Arial, sans-serif;">
+                <strong style="color: ${config.color}; font-size: 14px;">${report.riskText || config.label}</strong>
+                <hr style="margin: 6px 0;">
+                <div><strong>📍 Location:</strong> ${report.address}</div>
+                ${report.foundWhat ? `<div><strong>🦟 Found:</strong> ${report.foundWhat}</div>` : ''}
+                ${report.containerCount ? `<div><strong>📦 Containers:</strong> ${report.containerCount}</div>` : ''}
+                <div><strong>🎯 Accuracy:</strong> ±${config.radius} meters</div>
+                ${report.riskCategory === "HIGH" ? '<div style="color: #e74c3c; margin-top: 6px;"><strong>⚠️ Action needed within 24 hours</strong></div>' : ''}
+                <hr style="margin: 6px 0;">
+                <div style="font-size: 10px; color: #666;">Reported via BiteZero</div>
+            </div>
+        `;
+        
+        marker.bindPopup(popupContent);
+    }
+    
+    // Update status bar
+    function updateStatus(message) {
+        const statusDiv = document.getElementById('status');
+        if (statusDiv) {
+            statusDiv.innerHTML = message;
+        }
+    }
+    
+    // Start map when page loads
+    document.addEventListener('DOMContentLoaded', initMap);
+</script>
+</body>
+</html>
