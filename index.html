@@ -138,12 +138,13 @@
 
 <script>
     // ========================================
-    // BITEZERO LIVE MAP - AUTO-UPDATING
+    // BITEZERO LIVE MAP - JSON API VERSION
     // ========================================
     
-    // ⚠️ IMPORTANT: REPLACE THIS WITH YOUR PUBLISHED GOOGLE SHEET CSV LINK
-    // How to get it: File → Share → Publish to web → Select "Sheet1" → "Comma-separated values (.csv)" → Publish → Copy link
-    const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTsoqv9LNvp6SNWui6p1MCS4Rfh3iWdwP70P1Zw-4etVs_fv1v6UrQygsywFZKwTqmzmkc-YbXrXDgx/pub?output=csv";
+    // ⚠️ IMPORTANT: REPLACE WITH YOUR GOOGLE SHEET ID
+    // How to get it: Look at your sheet's URL
+    // https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit
+    const SHEET_ID = "1hlc17MiNRhBIocOZ5asWmdSoeMa5zITL_Q6DXK2lZyM";
     
     // Risk tier colors and circle radius (in meters)
     const riskConfig = {
@@ -174,16 +175,24 @@
         loadDataFromSheets();
     }
     
-    // Fetch and display data from Google Sheets
+    // Fetch and display data from Google Sheets using JSON API
     async function loadDataFromSheets() {
         try {
             updateStatus("📡 Fetching latest reports...");
             
-            const response = await fetch(CSV_URL);
+            // Google Sheets JSON API URL (no publishing required!)
+            const jsonUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
+            
+            const response = await fetch(jsonUrl);
             if (!response.ok) throw new Error("Failed to fetch sheet data");
             
-            const csvText = await response.text();
-            const reports = parseCSV(csvText);
+            const text = await response.text();
+            
+            // Parse the JSONP response (Google returns a weird format)
+            const jsonText = text.substring(47).slice(0, -2);
+            const data = JSON.parse(jsonText);
+            
+            const reports = parseSheetData(data);
             
             markersLayer.clearLayers();
             currentMarkers = [];
@@ -208,16 +217,23 @@
             
         } catch (error) {
             console.error("Error:", error);
-            updateStatus(`❌ Error: ${error.message}. Make sure your sheet is published.`);
+            updateStatus(`❌ Error: ${error.message}. Make sure your Sheet ID is correct.`);
         }
     }
     
-    // Parse CSV into array of report objects
-    function parseCSV(csvText) {
-        const lines = csvText.split('\n');
-        if (lines.length < 2) return [];
+    // Parse Google Sheets JSON response
+    function parseSheetData(data) {
+        const table = data.table;
+        const rows = table.rows;
+        const cols = table.cols;
         
-        const headers = parseCSVLine(lines[0]);
+        if (!rows || rows.length === 0) return [];
+        
+        // Get column names from the first row (headers)
+        const headers = [];
+        for (let i = 0; i < cols.length; i++) {
+            headers.push(cols[i].label);
+        }
         
         // Find column indices
         const latIdx = findHeaderIndex(headers, ['GPS_Latitude', 'Latitude', 'lat', 'Lat']);
@@ -229,22 +245,31 @@
         
         const reports = [];
         
-        for (let i = 1; i < lines.length; i++) {
-            if (!lines[i].trim()) continue;
+        for (let i = 0; i < rows.length; i++) {
+            const cells = rows[i].c;
+            if (!cells) continue;
             
-            const values = parseCSVLine(lines[i]);
-            if (values.length < Math.max(latIdx, lngIdx, 0) + 1) continue;
+            let lat = null;
+            let lng = null;
+            let risk = null;
+            let address = "";
+            let foundWhat = "";
+            let containerCount = "";
             
-            let lat = parseFloat(values[latIdx]?.replace(/"/g, '').trim());
-            let lng = parseFloat(values[lngIdx]?.replace(/"/g, '').trim());
+            for (let j = 0; j < cells.length; j++) {
+                const value = cells[j] ? cells[j].v : null;
+                if (value === null || value === undefined) continue;
+                
+                if (j === latIdx) lat = parseFloat(value);
+                else if (j === lngIdx) lng = parseFloat(value);
+                else if (j === riskIdx) risk = value;
+                else if (j === addressIdx) address = value;
+                else if (j === foundIdx) foundWhat = value;
+                else if (j === containerIdx) containerCount = value;
+            }
             
             // Skip invalid coordinates
             if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) continue;
-            
-            let risk = riskIdx !== -1 ? values[riskIdx]?.replace(/"/g, '').trim() : "🟡 MEDIUM RISK";
-            let address = addressIdx !== -1 ? values[addressIdx]?.replace(/"/g, '').trim() : "Unknown location";
-            let foundWhat = foundIdx !== -1 ? values[foundIdx]?.replace(/"/g, '').trim() : "";
-            let containerCount = containerIdx !== -1 ? values[containerIdx]?.replace(/"/g, '').trim() : "";
             
             // If risk not in sheet, calculate it
             if (!risk || risk === "" || (!risk.includes("🔴") && !risk.includes("🟡") && !risk.includes("🟢"))) {
@@ -257,38 +282,18 @@
         return reports;
     }
     
-    // Helper: find column index by trying multiple possible names
+    // Helper: find column index
     function findHeaderIndex(headers, possibleNames) {
         for (let i = 0; i < headers.length; i++) {
-            const headerClean = headers[i].replace(/"/g, '').trim();
+            const header = headers[i];
+            if (!header) continue;
             for (const name of possibleNames) {
-                if (headerClean === name || headerClean.toLowerCase() === name.toLowerCase() || headerClean.includes(name)) {
+                if (header === name || header.toLowerCase() === name.toLowerCase() || header.includes(name)) {
                     return i;
                 }
             }
         }
         return -1;
-    }
-    
-    // Helper: parse CSV line (handles quoted fields)
-    function parseCSVLine(line) {
-        const result = [];
-        let current = "";
-        let inQuotes = false;
-        
-        for (let i = 0; i < line.length; i++) {
-            const char = line[i];
-            if (char === '"') {
-                inQuotes = !inQuotes;
-            } else if (char === ',' && !inQuotes) {
-                result.push(current);
-                current = "";
-            } else {
-                current += char;
-            }
-        }
-        result.push(current);
-        return result;
     }
     
     // Calculate risk tier from form values (fallback)
