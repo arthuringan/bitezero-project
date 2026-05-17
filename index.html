@@ -32,6 +32,7 @@
             border-radius: 5px;
             font-size: 12px;
             z-index: 1000;
+            font-family: monospace;
         }
         button {
             position: absolute;
@@ -47,25 +48,31 @@
             font-weight: bold;
         }
         button:hover { background: #2c6e9e; }
+        .error {
+            background: rgba(231, 76, 60, 0.9) !important;
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
     <div class="legend">
-        <div class="legend-item"><div class="legend-color" style="background: #e74c3c;"></div> HIGH RISK (24h clean-up)</div>
-        <div class="legend-item"><div class="legend-color" style="background: #f1c40f;"></div> MEDIUM RISK (48h inspect)</div>
-        <div class="legend-item"><div class="legend-color" style="background: #27ae60;"></div> LOW RISK (monitor)</div>
-        <div class="legend-item"><div class="legend-color" style="background: #3498db;"></div> Accuracy circle (±30-50m)</div>
+        <div class="legend-item"><div class="legend-color" style="background: #e74c3c;"></div> 🔴 HIGH RISK (24h clean-up)</div>
+        <div class="legend-item"><div class="legend-color" style="background: #f1c40f;"></div> 🟡 MEDIUM RISK (48h inspect)</div>
+        <div class="legend-item"><div class="legend-color" style="background: #27ae60;"></div> 🟢 LOW RISK (monitor)</div>
+        <div class="legend-item"><div class="legend-color" style="background: #3498db;"></div> 🔵 Accuracy circle (±30-50m)</div>
     </div>
-    <div class="status" id="status">Loading map data...</div>
+    <div class="status" id="status">🔄 Loading map data...</div>
     <button onclick="fetchData()">🔄 Refresh</button>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
     <script>
-        // --- CONFIGURATION ---
-        // IMPORTANT: Use the FULL "Publish to web" CSV link
+        // ========================================
+        // BITEZERO LIVE MAP - WORKING VERSION
+        // ========================================
+        
+        // YOUR PUBLISHED GOOGLE SHEET CSV URL
         const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTsoqv9LNvp6SNWui6p1MCS4Rfh3iWdwP70P1Zw-4etVs_fv1v6UrQygsywFZKwTqmzmkc-YbXrXDgx/pub?output=csv";
         
         let map;
@@ -73,9 +80,10 @@
         
         // Risk styling
         function getRiskStyle(riskText) {
-            if (riskText.includes("🔴") || riskText.includes("HIGH")) 
+            if (!riskText) return { color: "#27ae60", radius: 30, label: "LOW" };
+            if (riskText.includes("🔴") || riskText.toUpperCase().includes("HIGH")) 
                 return { color: "#e74c3c", radius: 50, label: "HIGH" };
-            if (riskText.includes("🟡") || riskText.includes("MEDIUM")) 
+            if (riskText.includes("🟡") || riskText.toUpperCase().includes("MEDIUM")) 
                 return { color: "#f1c40f", radius: 40, label: "MEDIUM" };
             return { color: "#27ae60", radius: 30, label: "LOW" };
         }
@@ -84,26 +92,33 @@
         function initMap() {
             map = L.map('map').setView([14.5995, 120.9842], 12);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors',
+                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
                 maxZoom: 19
             }).addTo(map);
             markerGroup = L.layerGroup().addTo(map);
             fetchData();
         }
         
-        // Fetch and parse CSV
+        // Fetch and parse CSV using proxy to avoid CORS issues
         async function fetchData() {
             const statusDiv = document.getElementById('status');
-            statusDiv.innerHTML = "🔄 Fetching reports...";
+            statusDiv.innerHTML = "🔄 Fetching reports from Google Sheets...";
+            statusDiv.classList.remove('error');
             statusDiv.style.background = "rgba(0,0,0,0.7)";
             
             try {
-                // Fetch CSV
-                const response = await fetch(CSV_URL);
+                // Use a CORS proxy to avoid HTTP 400 errors
+                const proxyUrl = 'https://api.allorigins.win/raw?url=';
+                const response = await fetch(proxyUrl + encodeURIComponent(CSV_URL));
+                
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 
                 const csvText = await response.text();
-                if (csvText.length < 50) throw new Error("CSV is empty. Check publish settings.");
+                console.log("CSV fetched, length:", csvText.length);
+                
+                if (csvText.length < 50) {
+                    throw new Error("CSV appears empty. Re-publish your sheet.");
+                }
                 
                 // Parse CSV with PapaParse
                 Papa.parse(csvText, {
@@ -112,85 +127,97 @@
                     complete: (results) => {
                         const data = results.data;
                         console.log("Parsed rows:", data.length);
-                        console.log("First row sample:", data[0]);
                         
                         if (data.length === 0) {
-                            statusDiv.innerHTML = "⚠️ No data found in CSV.";
+                            statusDiv.innerHTML = "⚠️ No data found. Submit a test report!";
                             return;
                         }
+                        
+                        // Show first row to debug
+                        console.log("First row sample:", data[0]);
                         
                         // Clear old markers
                         markerGroup.clearLayers();
                         
                         let addedCount = 0;
+                        let skippedCount = 0;
                         
                         // Loop through each row
-                        data.forEach(row => {
-                            // Try to find latitude and longitude columns (case insensitive)
-                            let lat = null, lng = null;
+                        data.forEach((row, index) => {
+                            // Try multiple possible column names
+                            let lat = row['GPS_Latitude'] || row['gps_latitude'] || row['Latitude'] || row['latitude'];
+                            let lng = row['GPS_Longitude'] || row['gps_longitude'] || row['Longitude'] || row['longitude'];
                             
-                            for (let key in row) {
-                                const lowerKey = key.toLowerCase();
-                                if ((lowerKey.includes('latitude') || lowerKey === 'gps_latitude') && !lat) 
-                                    lat = parseFloat(row[key]);
-                                if ((lowerKey.includes('longitude') || lowerKey === 'gps_longitude') && !lng) 
-                                    lng = parseFloat(row[key]);
-                            }
-                            
-                            // Also check common column names directly
-                            if (isNaN(lat)) lat = parseFloat(row['GPS_Latitude']);
-                            if (isNaN(lng)) lng = parseFloat(row['GPS_Longitude']);
+                            // Convert to numbers
+                            lat = parseFloat(lat);
+                            lng = parseFloat(lng);
                             
                             // Get risk tier
                             let risk = row['Risk_Tier'] || row['risk_tier'] || "🟡 MEDIUM RISK";
                             
                             // Get address
-                            let address = row['Manual address'] || row['Location description'] || "Unknown";
+                            let address = row['Manual address'] || row['Location description'] || row['Address'] || "Unknown location";
                             
-                            // Add marker if coordinates valid
+                            // Validate coordinates
                             if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
                                 addMarkerToMap(lat, lng, risk, address);
                                 addedCount++;
+                            } else {
+                                skippedCount++;
+                                console.log(`Row ${index + 1}: Invalid coords - lat:${lat}, lng:${lng}`);
                             }
                         });
                         
-                        statusDiv.innerHTML = `✅ Loaded ${addedCount} reports`;
-                        if (addedCount === 0) statusDiv.innerHTML = "⚠️ No valid coordinates found. Check column names.";
-                        
-                        // Fit bounds
-                        if (markerGroup.getLayers().length > 0) {
-                            const bounds = markerGroup.getBounds();
-                            if (bounds.isValid()) map.fitBounds(bounds.pad(0.1));
+                        // Update status
+                        if (addedCount === 0) {
+                            statusDiv.innerHTML = `⚠️ No valid coordinates found. ${data.length} total records, ${skippedCount} skipped. Check GPS columns.`;
+                            statusDiv.style.background = "rgba(243, 156, 18, 0.9)";
+                        } else {
+                            statusDiv.innerHTML = `✅ ${addedCount} dengue hotspot${addedCount !== 1 ? 's' : ''} loaded`;
+                            
+                            // Fit map to show all markers
+                            if (markerGroup.getLayers().length > 0) {
+                                const bounds = markerGroup.getBounds();
+                                if (bounds.isValid()) {
+                                    map.fitBounds(bounds.pad(0.1));
+                                }
+                            }
                         }
                         
-                        setTimeout(() => { statusDiv.style.opacity = "0.7"; }, 3000);
+                        // Auto-fade status after 5 seconds
+                        setTimeout(() => {
+                            if (statusDiv.innerHTML.includes('✅')) {
+                                statusDiv.style.opacity = '0.6';
+                            }
+                        }, 5000);
                     },
-                    error: (error) => {
-                        console.error("Parse error:", error);
-                        statusDiv.innerHTML = "❌ Failed to parse CSV.";
+                    error: (parseError) => {
+                        console.error("Parse error:", parseError);
+                        statusDiv.innerHTML = "❌ Failed to parse CSV data.";
+                        statusDiv.classList.add('error');
                     }
                 });
                 
             } catch (error) {
                 console.error("Fetch error:", error);
-                statusDiv.innerHTML = `❌ Error: ${error.message}`;
-                statusDiv.style.background = "rgba(231, 76, 60, 0.9)";
+                statusDiv.innerHTML = `❌ ${error.message}. Check that your sheet is published.`;
+                statusDiv.classList.add('error');
             }
         }
         
         function addMarkerToMap(lat, lng, risk, address) {
             const style = getRiskStyle(risk);
             
-            // Marker icon
-            const icon = L.divIcon({
+            // Create custom marker
+            const markerIcon = L.divIcon({
                 html: `<div style="background-color: ${style.color}; width: 18px; height: 18px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></div>`,
                 iconSize: [18, 18],
                 className: 'custom-marker'
             });
             
-            const marker = L.marker([lat, lng], { icon }).addTo(markerGroup);
+            const marker = L.marker([lat, lng], { icon: markerIcon }).addTo(markerGroup);
             
-            // Accuracy circle
+            // Add accuracy circle
             L.circle([lat, lng], {
                 color: style.color,
                 fillColor: style.color,
@@ -199,19 +226,34 @@
                 weight: 2
             }).addTo(markerGroup);
             
-            // Popup
-            marker.bindPopup(`
-                <b style="color:${style.color}">${risk}</b><br>
-                📍 ${address}<br>
-                🎯 ±${style.radius}m accuracy<br>
-                ${style.label === "HIGH" ? "⚠️ Clean-up needed within 24 hours" : ""}
-            `);
+            // Create popup content
+            const popupHtml = `
+                <div style="min-width: 200px; font-family: Arial, sans-serif;">
+                    <b style="color: ${style.color}; font-size: 14px;">${risk}</b>
+                    <hr style="margin: 8px 0;">
+                    <div><strong>📍 Location:</strong><br>${escapeHtml(address)}</div>
+                    <div style="margin-top: 8px;"><strong>🎯 Accuracy:</strong> ±${style.radius} meters</div>
+                    ${style.label === "HIGH" ? '<div style="color: #e74c3c; margin-top: 8px;"><strong>⚠️ Clean-up needed within 24 hours</strong></div>' : ''}
+                    <hr style="margin: 8px 0;">
+                    <div style="font-size: 10px; color: #666;">Reported via BiteZero</div>
+                </div>
+            `;
+            
+            marker.bindPopup(popupHtml);
+        }
+        
+        // Helper function to escape HTML
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
         
         // Refresh every 60 seconds
         setInterval(fetchData, 60000);
         
-        // Start
+        // Start the map when page loads
         document.addEventListener('DOMContentLoaded', initMap);
     </script>
 </body>
