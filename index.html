@@ -81,7 +81,7 @@
             vertical-align: middle;
         }
         
-        /* Stats Boxes - NOW AT BOTTOM */
+        /* Stats Boxes */
         .stats-container {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -137,6 +137,22 @@
             margin-top: 15px;
         }
         
+        /* Photo link styling */
+        .photo-link {
+            display: inline-block;
+            background: #1a5276;
+            color: white;
+            text-decoration: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-top: 6px;
+        }
+        
+        .photo-link:hover {
+            background: #2c6e9e;
+        }
+        
         @media (max-width: 600px) {
             body { padding: 10px; }
             .stat-number { font-size: 28px; }
@@ -181,7 +197,7 @@
         </div>
     </div>
     
-    <!-- Stats Boxes - NOW AT BOTTOM -->
+    <!-- Stats Boxes -->
     <div class="stats-container" id="statsContainer">
         <div class="stat-card total">
             <div class="stat-number" id="totalReports">0</div>
@@ -205,7 +221,7 @@
         📡 Loading map data from Google Sheets...
     </div>
     <div class="refresh-note">
-        🔄 Map auto-refreshes every 60 seconds. New reports appear automatically.
+        🔄 Map auto-refreshes every 60 seconds. Click on any pin to see report details and photo evidence.
     </div>
 </div>
 
@@ -216,6 +232,7 @@
     // ========================================
     // BITEZERO LIVE MAP - OpenStreetMap Version
     // Reads from Google Sheets by column position
+    // Column J = Photo link (column 10)
     // Column L = GPS_Latitude (column 12)
     // Column M = GPS_Longitude (column 13)  
     // Column O = Risk_Tier (column 15)
@@ -320,9 +337,11 @@
             if (values.length < 15) continue;
             
             // Column positions (0-indexed):
+            // Column J = index 9 (10th column) = Photo link
             // Column L = index 11 (12th column) = GPS_Latitude
             // Column M = index 12 (13th column) = GPS_Longitude
             // Column O = index 14 (15th column) = Risk_Tier
+            const photoLink = values[9]?.replace(/"/g, '').trim() || "";
             const lat = parseFloat(values[11]?.replace(/"/g, '').trim());
             const lng = parseFloat(values[12]?.replace(/"/g, '').trim());
             let risk = values[14]?.replace(/"/g, '').trim() || "🟡 MEDIUM RISK";
@@ -340,7 +359,8 @@
             reports.push({
                 lat: lat,
                 lng: lng,
-                risk: risk
+                risk: risk,
+                photoLink: photoLink
             });
         }
         
@@ -403,13 +423,33 @@
             weight: 2
         }).addTo(markersLayer);
         
-        // Popup content
+        // Build popup content with photo link if available
+        let photoHtml = "";
+        if (report.photoLink && report.photoLink !== "") {
+            // Google Drive sharing links need to be converted to direct view
+            let directPhotoLink = report.photoLink;
+            // If it's a Google Drive sharing link, convert to preview
+            if (directPhotoLink.includes("drive.google.com")) {
+                const fileIdMatch = directPhotoLink.match(/[-\w]{25,}/);
+                if (fileIdMatch) {
+                    directPhotoLink = `https://drive.google.com/file/d/${fileIdMatch[0]}/preview`;
+                }
+            }
+            photoHtml = `
+                <div style="margin-top: 8px;">
+                    <a href="${directPhotoLink}" target="_blank" class="photo-link">📸 View Photo Evidence</a>
+                </div>
+            `;
+        }
+        
+        // Popup content with optional photo
         const popupContent = `
-            <div style="min-width: 180px;">
+            <div style="min-width: 200px;">
                 <strong style="color: ${config.color}; font-size: 14px;">${report.risk.replace('🔴', '').replace('🟡', '').replace('🟢', '')}</strong>
                 <hr style="margin: 6px 0;">
                 <div>📍 <strong>Location:</strong> Report #${currentMarkers.length + 1}</div>
                 <div>🎯 <strong>Accuracy:</strong> ±${config.radius} meters</div>
+                ${photoHtml}
                 ${report.risk === "🔴 HIGH RISK" ? '<div style="color: #e74c3c; margin-top: 6px;"><strong>⚠️ Action needed within 24 hours</strong></div>' : ''}
                 <hr style="margin: 6px 0;">
                 <div style="font-size: 10px; color: #888;">Reported via BiteZero</div>
