@@ -121,13 +121,52 @@
         .medium .stat-number { color: #f1c40f; }
         .high .stat-number { color: #e74c3c; }
         
+        /* Status bar with refresh button container */
+        .status-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
         .status {
             background: #e8f0fe;
             padding: 10px 15px;
             border-radius: 8px;
-            text-align: center;
             color: #1a5276;
             font-size: 14px;
+            flex: 1;
+        }
+        
+        /* Manual Refresh Button */
+        .refresh-button {
+            background: #1a5276;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+        
+        .refresh-button:hover {
+            background: #2c6e9e;
+            transform: scale(1.02);
+        }
+        
+        .refresh-button:active {
+            transform: scale(0.98);
+        }
+        
+        .refresh-button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
         }
         
         .refresh-note {
@@ -159,6 +198,8 @@
             .stat-number { font-size: 28px; }
             .legend-item { display: block; margin-bottom: 8px; }
             #map { height: 400px; }
+            .status-container { flex-direction: column; }
+            .refresh-button { width: 100%; }
         }
     </style>
 </head>
@@ -218,11 +259,17 @@
         </div>
     </div>
     
-    <div class="status" id="status">
-        📡 Loading map data from Google Sheets...
+    <!-- Status bar with manual refresh button -->
+    <div class="status-container">
+        <div class="status" id="status">
+            📡 Loading map data from Google Sheets...
+        </div>
+        <button id="manualRefreshBtn" class="refresh-button">
+            🔄 Refresh Now
+        </button>
     </div>
     <div class="refresh-note">
-        🔄 Map auto-refreshes every 60 seconds. Click on any pin to see report details and photo evidence.
+        🔄 Map auto-refreshes every 60 seconds. Click "Refresh Now" for instant updates. Click on any pin to see report details and photo evidence.
     </div>
 </div>
 
@@ -253,6 +300,7 @@
     let map;
     let markersLayer;
     let currentMarkers = [];
+    let refreshInterval;
     
     // Philippine default center (Manila)
     const defaultCenter = [14.5995, 120.9842];
@@ -272,7 +320,7 @@
         loadDataFromSheets();
         
         // Auto-refresh every 60 seconds
-        setInterval(loadDataFromSheets, 60000);
+        refreshInterval = setInterval(loadDataFromSheets, 60000);
     }
     
     // Load data from Google Sheets CSV
@@ -315,7 +363,7 @@
                 map.setView(defaultCenter, 12);
             }
             
-            updateStatus(`✅ Loaded ${validCount} reports from Google Sheets. Auto-refreshes every 60 seconds.`);
+            updateStatus(`✅ Loaded ${validCount} reports from Google Sheets.`);
             
         } catch (error) {
             console.error("Error:", error);
@@ -468,8 +516,30 @@
         if (statusDiv) statusDiv.innerHTML = message;
     }
     
+    // Manual refresh button functionality
+    function setupRefreshButton() {
+        const refreshBtn = document.getElementById('manualRefreshBtn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', async function() {
+                // Disable button while refreshing
+                refreshBtn.disabled = true;
+                refreshBtn.textContent = '🔄 Refreshing...';
+                
+                // Force reload data
+                await loadDataFromSheets();
+                
+                // Re-enable button
+                refreshBtn.disabled = false;
+                refreshBtn.textContent = '🔄 Refresh Now';
+            });
+        }
+    }
+    
     // Start the map when page loads
-    document.addEventListener('DOMContentLoaded', initMap);
+    document.addEventListener('DOMContentLoaded', function() {
+        initMap();
+        setupRefreshButton();
+    });
 </script>
 </body>
 </html>
