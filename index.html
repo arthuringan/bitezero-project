@@ -15,9 +15,7 @@
             box-sizing: border-box;
         }
         
-        /* CRITICAL: Force iframe to fill container properly */
         html, body {
-            height: 100%;
             margin: 0;
             padding: 0;
         }
@@ -25,108 +23,96 @@
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #f0f4f8;
-            padding: 20px;
-            min-height: 100%;
+            padding: 16px;
         }
         
         .map-container {
             max-width: 1400px;
             margin: 0 auto;
-            height: 100%;
-            min-height: 650px;
-            display: flex;
-            flex-direction: column;
         }
         
         h1 {
             color: #1a5276;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             display: flex;
             align-items: center;
-            gap: 10px;
-            font-size: 24px;
-            flex-shrink: 0;
+            gap: 8px;
+            font-size: 20px;
         }
         
         .subtitle {
             color: #555;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
             border-bottom: 2px solid #ddd;
-            flex-shrink: 0;
+            font-size: 14px;
         }
         
+        /* FIXED MAP HEIGHT - Same on all devices */
         #map {
-            height: 450px;
+            height: 400px;
             width: 100%;
             border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             background: #e8f0fe;
-            flex-shrink: 0;
         }
         
         /* Legend */
         .legend {
             background: white;
-            padding: 15px 20px;
+            padding: 12px 15px;
             border-radius: 10px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-            flex-shrink: 0;
+            margin-bottom: 15px;
         }
         
         .legend h3 {
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             color: #1a5276;
-            font-size: 16px;
+            font-size: 14px;
         }
         
         .legend-item {
             display: inline-block;
-            margin-right: 25px;
-            margin-bottom: 8px;
+            margin-right: 20px;
+            margin-bottom: 5px;
+            font-size: 12px;
         }
         
         .legend-color {
             display: inline-block;
-            width: 20px;
-            height: 20px;
+            width: 16px;
+            height: 16px;
             border-radius: 50%;
-            margin-right: 8px;
+            margin-right: 6px;
             vertical-align: middle;
         }
         
         /* Stats Boxes */
         .stats-container {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 15px;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
             margin-bottom: 15px;
-            flex-shrink: 0;
         }
         
         .stat-card {
             background: white;
-            border-radius: 12px;
-            padding: 15px;
+            border-radius: 10px;
+            padding: 12px;
             text-align: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            transition: transform 0.2s;
-        }
-        
-        .stat-card:hover {
-            transform: translateY(-3px);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
         }
         
         .stat-number {
-            font-size: 32px;
+            font-size: 28px;
             font-weight: bold;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
         }
         
         .stat-label {
-            font-size: 12px;
+            font-size: 11px;
             color: #666;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -137,61 +123,51 @@
         .medium .stat-number { color: #f1c40f; }
         .high .stat-number { color: #e74c3c; }
         
-        /* Status bar with refresh button container */
+        /* Status bar with refresh button */
         .status-container {
             display: flex;
             align-items: center;
             justify-content: space-between;
             flex-wrap: wrap;
             gap: 10px;
-            margin-bottom: 15px;
-            flex-shrink: 0;
+            margin-bottom: 12px;
         }
         
         .status {
             background: #e8f0fe;
-            padding: 10px 15px;
+            padding: 8px 12px;
             border-radius: 8px;
             color: #1a5276;
-            font-size: 13px;
+            font-size: 12px;
             flex: 1;
         }
         
-        /* Manual Refresh Button */
         .refresh-button {
             background: #1a5276;
             color: white;
             border: none;
-            padding: 10px 20px;
+            padding: 8px 16px;
             border-radius: 8px;
-            font-size: 13px;
+            font-size: 12px;
             cursor: pointer;
-            transition: all 0.2s ease;
             font-weight: bold;
             white-space: nowrap;
         }
         
         .refresh-button:hover {
             background: #2c6e9e;
-            transform: scale(1.02);
-        }
-        
-        .refresh-button:active {
-            transform: scale(0.98);
         }
         
         .refresh-button:disabled {
             background: #95a5a6;
             cursor: not-allowed;
-            transform: none;
         }
         
         .refresh-note {
             text-align: center;
-            font-size: 11px;
+            font-size: 10px;
             color: #888;
             margin-top: 10px;
-            flex-shrink: 0;
         }
         
         /* Photo link styling */
@@ -202,47 +178,23 @@
             text-decoration: none;
             padding: 4px 10px;
             border-radius: 4px;
-            font-size: 12px;
+            font-size: 11px;
             margin-top: 6px;
         }
         
         .photo-link:hover {
             background: #2c6e9e;
-            color: white !important;
         }
         
-        /* Desktop screens */
-        @media (min-width: 1024px) {
-            #map { height: 500px; }
-            .stat-number { font-size: 36px; }
-            .stat-card { padding: 20px; }
-        }
-        
-        /* Tablets */
-        @media (min-width: 768px) and (max-width: 1023px) {
-            #map { height: 420px; }
-            .stat-number { font-size: 30px; }
-            .stat-label { font-size: 11px; }
-        }
-        
-        /* Mobile phones */
-        @media (max-width: 767px) {
-            body { padding: 12px; }
-            #map { height: 350px; }
-            .stat-number { font-size: 24px; }
-            .stat-label { font-size: 10px; }
-            .stat-card { padding: 12px; }
-            .legend-item { display: block; margin-bottom: 8px; }
+        /* Mobile adjustments - map height stays 400px */
+        @media (max-width: 600px) {
+            body { padding: 10px; }
+            .stat-number { font-size: 22px; }
+            .legend-item { display: block; margin-bottom: 6px; }
             .status-container { flex-direction: column; }
             .refresh-button { width: 100%; text-align: center; }
-            .map-container { min-height: 550px; }
-        }
-        
-        /* Small phones */
-        @media (max-width: 480px) {
-            #map { height: 300px; }
-            .stat-number { font-size: 20px; }
-            h1 { font-size: 20px; }
+            h1 { font-size: 18px; }
+            .stat-card { padding: 8px; }
         }
     </style>
 </head>
@@ -259,7 +211,7 @@
     <!-- Map -->
     <div id="map"></div>
     
-    <!-- Legend (without emojis, just colors) -->
+    <!-- Legend -->
     <div class="legend">
         <h3>📍 Map Legend</h3>
         <div>
@@ -322,11 +274,6 @@
 <script>
     // ========================================
     // BITEZERO LIVE MAP - OpenStreetMap Version
-    // Reads from Google Sheets by column position
-    // Column J = Photo link (column 10)
-    // Column L = GPS_Latitude (column 12)
-    // Column M = GPS_Longitude (column 13)  
-    // Column O = Risk_Tier (column 15)
     // ========================================
     
     const GOOGLE_SHEETS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTsoqv9LNvp6SNWui6p1MCS4Rfh3iWdwP70P1Zw-4etVs_fv1v6UrQygsywFZKwTqmzmkc-YbXrXDgx/pub?output=csv";
@@ -352,7 +299,6 @@
     function initMap() {
         map = L.map('map').setView(defaultCenter, 12);
         
-        // Add OpenStreetMap tiles (free, no API key)
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             maxZoom: 19
@@ -361,8 +307,6 @@
         markersLayer = L.layerGroup().addTo(map);
         
         loadDataFromSheets();
-        
-        // Auto-refresh every 60 seconds
         refreshInterval = setInterval(loadDataFromSheets, 60000);
     }
     
@@ -377,7 +321,6 @@
             const csvText = await response.text();
             const reports = parseCSV(csvText);
             
-            // Update stats boxes
             updateStats(reports);
             
             if (reports.length === 0) {
@@ -385,11 +328,9 @@
                 return;
             }
             
-            // Clear existing markers
             markersLayer.clearLayers();
             currentMarkers = [];
             
-            // Add markers for each report
             let validCount = 0;
             reports.forEach(report => {
                 if (report.lat && report.lng && !isNaN(report.lat) && !isNaN(report.lng)) {
@@ -398,7 +339,6 @@
                 }
             });
             
-            // Fit map bounds to show all markers
             if (currentMarkers.length > 0) {
                 const group = L.featureGroup(currentMarkers);
                 map.fitBounds(group.getBounds().pad(0.1));
@@ -414,7 +354,7 @@
         }
     }
     
-    // Parse CSV - handles quoted fields properly
+    // Parse CSV
     function parseCSV(csvText) {
         const lines = csvText.split('\n');
         if (lines.length < 2) return [];
@@ -424,15 +364,9 @@
         for (let i = 1; i < lines.length; i++) {
             if (!lines[i].trim()) continue;
             
-            // Simple CSV parsing (handles quoted values)
             const values = parseCSVLine(lines[i]);
             if (values.length < 15) continue;
             
-            // Column positions (0-indexed):
-            // Column J = index 9 (10th column) = Photo link
-            // Column L = index 11 (12th column) = GPS_Latitude
-            // Column M = index 12 (13th column) = GPS_Longitude
-            // Column O = index 14 (15th column) = Risk_Tier
             const photoLink = values[9]?.replace(/"/g, '').trim() || "";
             const lat = parseFloat(values[11]?.replace(/"/g, '').trim());
             const lng = parseFloat(values[12]?.replace(/"/g, '').trim());
@@ -440,7 +374,6 @@
             
             if (isNaN(lat) || isNaN(lng)) continue;
             
-            // Clean up risk tier (ensure emojis are present)
             if (!risk.includes("🔴") && !risk.includes("🟡") && !risk.includes("🟢")) {
                 if (risk.toLowerCase().includes("high")) risk = "🔴 HIGH RISK";
                 else if (risk.toLowerCase().includes("medium")) risk = "🟡 MEDIUM RISK";
@@ -448,18 +381,12 @@
                 else risk = "🟡 MEDIUM RISK";
             }
             
-            reports.push({
-                lat: lat,
-                lng: lng,
-                risk: risk,
-                photoLink: photoLink
-            });
+            reports.push({ lat, lng, risk, photoLink });
         }
         
         return reports;
     }
     
-    // Parse a single CSV line (handles quoted fields with commas)
     function parseCSVLine(line) {
         const result = [];
         let current = "";
@@ -480,7 +407,6 @@
         return result;
     }
     
-    // Update the 4 stats boxes
     function updateStats(reports) {
         const total = reports.length;
         const low = reports.filter(r => r.risk === "🟢 LOW RISK").length;
@@ -493,11 +419,9 @@
         document.getElementById('highRiskCount').textContent = high;
     }
     
-    // Add a single marker with circle to map
     function addMarkerToMap(report) {
         const config = riskConfig[report.risk] || riskConfig["default"];
         
-        // Custom marker (colored circle)
         const markerIcon = L.divIcon({
             html: `<div style="background-color: ${config.fillColor}; width: 18px; height: 18px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></div>`,
             iconSize: [18, 18],
@@ -506,8 +430,7 @@
         
         const marker = L.marker([report.lat, report.lng], { icon: markerIcon }).addTo(markersLayer);
         
-        // Accuracy circle
-        const circle = L.circle([report.lat, report.lng], {
+        L.circle([report.lat, report.lng], {
             color: config.color,
             fillColor: config.fillColor,
             fillOpacity: 0.15,
@@ -515,26 +438,18 @@
             weight: 2
         }).addTo(markersLayer);
         
-        // Build popup content with photo link if available
         let photoHtml = "";
         if (report.photoLink && report.photoLink !== "") {
-            // Google Drive sharing links need to be converted to direct view
             let directPhotoLink = report.photoLink;
-            // If it's a Google Drive sharing link, convert to preview
             if (directPhotoLink.includes("drive.google.com")) {
                 const fileIdMatch = directPhotoLink.match(/[-\w]{25,}/);
                 if (fileIdMatch) {
                     directPhotoLink = `https://drive.google.com/file/d/${fileIdMatch[0]}/preview`;
                 }
             }
-            photoHtml = `
-                <div style="margin-top: 8px;">
-                    <a href="${directPhotoLink}" target="_blank" class="photo-link">📸 View Photo Evidence</a>
-                </div>
-            `;
+            photoHtml = `<div style="margin-top: 8px;"><a href="${directPhotoLink}" target="_blank" class="photo-link">📸 View Photo Evidence</a></div>`;
         }
         
-        // Popup content with optional photo
         const popupContent = `
             <div style="min-width: 200px;">
                 <strong style="color: ${config.color}; font-size: 14px;">${report.risk.replace('🔴', '').replace('🟡', '').replace('🟢', '')}</strong>
@@ -549,9 +464,7 @@
         `;
         
         marker.bindPopup(popupContent);
-        
         currentMarkers.push(marker);
-        currentMarkers.push(circle);
     }
     
     function updateStatus(message) {
@@ -559,7 +472,6 @@
         if (statusDiv) statusDiv.innerHTML = message;
     }
     
-    // Manual refresh button functionality
     function setupRefreshButton() {
         const refreshBtn = document.getElementById('manualRefreshBtn');
         if (refreshBtn) {
@@ -573,7 +485,6 @@
         }
     }
     
-    // Start the map when page loads
     document.addEventListener('DOMContentLoaded', function() {
         initMap();
         setupRefreshButton();
